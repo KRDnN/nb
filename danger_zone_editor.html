@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% block title %}위험구역 지정 | {{ filename }}{% endblock %}
+
+{% block content %}
+<h2>위험구역 지정: {{ filename }}</h2>
+<div>
+    <canvas id="frame-canvas" width="640" height="480" style="border:1.5px solid #aaa; border-radius:8px; background:#222;"></canvas>
+    <div style="margin-top:7px;">
+        <input type="range" id="slider" min="0" max="{{ frame_count-1 }}" value="0" style="width:410px;" oninput="moveFrame(this.value)">
+        <span id="cur-frame">0</span>
+    </div>
+    <div id="thumbs" style="display:flex; gap:6px; margin-top:6px; overflow-x:auto; width:640px;"></div>
+</div>
+<div style="margin:16px 0;">
+    <button onclick="saveZone()">저장</button>
+    <button onclick="editZone()">다시지정</button>
+    <button onclick="deleteZone()">삭제</button>
+    <span id="zone-info" style="margin-left:16px; color:#656;"></span>
+</div>
+<style>
+#thumbs img {
+    width: 54px; height: 40px; border-radius: 5px; border: 1px solid #bbb;
+    margin-right: 2px; background: #ececec; cursor:pointer;
+    transition: box-shadow 0.15s;
+}
+#thumbs img.selected { box-shadow:0 0 0 2px #0bf inset; }
+#frame-canvas { background: #222; }
+</style>
+<script>
+const filename = "{{ filename }}";
+let frameIdx = 0, maxFrames = {{ frame_count }};
+let polygon = [], isPolyClosed = false;
+const canvas = document.getElementById('frame-canvas');
+const ctx = canvas.getContext('2d');
+
+// 썸네일 생성 및 표시
+function makeThumbnails(){
+    let thumbsHtml = '';
+    let step = Math.max(1, Math.floor(maxFrames/16));
+    for(let i=0;i<maxFrames;i+=step)
+      thumbsHtml += `<img src="/frame/${filename}/${i}" onclick="moveFrame(${i})" id="thumb${i}">`;
+    document.getElementById('thumbs').innerHTML = thumbsHtml;
+}
+function moveFrame(idx){
+    frameIdx = parseInt(idx);
+    loadFrame(frameIdx);
+    // 썸네일 선택 강조
+    document.querySelectorAll('#thumbs img').forEach(el=>el.classList.remove('selected'));
+    let thumb = document.getElementById('thumb'+idx);
+    if(thumb) thumb.classList.add('selected');
+}
+function loadFrame(idx) {
+    const img = new Image();
+    img.onload = function() {
+        ctx.clearRect(0,0,canvas.width,canvas.height);
+        ctx.drawImage(img,0,0,canvas.width,canvas.height);
+        drawPolygon();
+        document.getElementById('cur-frame').innerText = idx;
+        document.getElementById('slider').value = idx;
+    };
+    img.src = `/frame/${filename}/${idx}`;
+}
+// 폴리곤 클릭/완성
+canvas.addEventListener('click', (e)=>{
+    if(isPolyClosed) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = Math.round((e.clientX-rect.left)*canvas.width/rect.width);
+    const y = Math.round((e.clientY-rect.top)*canvas.height/rect.height);
+    polygon.push([x,y]);
+    drawPolygon();
+});
+canvas.addEventListener('dblclick', ()=>{
+    if(polygon.length>=3){ isPolyClosed=true; drawPolygon(); }
+});
+function drawPolygon() {
+    ctx.lineWidth = 2.5;
+    ctx.strokeStyle = "#ff4444";
+    ctx.fillStyle = "rgba(255,0,0,0.16)";
+    if(polygon.length){
+        ctx.beginPath();
+        ctx.moveTo(...polygon[0]);
+        for(let i=1;i<polygon.length;i++) ctx.lineTo(...polygon[i]);
+        if(isPolyClosed) ctx.closePath();
+        ctx.stroke();
+        if(isPolyClosed) ctx.fill();
+        for(let p of polygon){
+            ctx.beginPath();
+            ctx.arc(p[0],p[1],5,0,2*Math.PI);
+            ctx.fillStyle="#ff2222";
+            ctx.fill();
+        }
+    }
+    document.getElementById('zone-info').innerText =
+      "점 좌표: "+JSON.stringify(polygon)+(isPolyClosed?" (닫힘)":"");
+}
+async function saveZone(){
+    if(!isPolyClosed){ alert("폴리곤을 완성하세요! (더블클릭)"); return;}
+    const res = await fetch('/save_zone', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          filename: filename,
+          zones: {"main": {frame:frameIdx, points:polygon}}
+        })
+    });
+    if(res.ok) alert("저장 완료!");
+    else alert("저장 실패");
+}
+function deleteZone(){
+    // danger zone 삭제기능(추후 구현)
+    alert("삭제 기능은 백엔드 구현 필요!");
+}
+function editZone(){
+    isPolyClosed = false;
+    polygon = [];
+    drawPolygon();
+}
+window.onload = function(){
+    makeThumbnails();
+    loadFrame(0);
+    // meta에서 기존 polygon 로딩(존재시)
+    {% if meta and meta.zones and meta.zones[0].points %}
+      polygon = {{ meta.zones[0].points }};
+      isPolyClosed = true;
+      setTimeout(()=>drawPolygon(), 220);
+    {% endif %}
+};
+</script>
+{% endblock %}
