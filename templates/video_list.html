@@ -1,0 +1,70 @@
+<!-- templates/video_list.html -->
+<!DOCTYPE html>
+<html>
+<head>
+    <title>위험구역 관리</title>
+    <script>
+    async function loadDangerZones(video, containerId) {
+        const proj = video.split('.')[0];
+        const container = document.getElementById(containerId);
+        container.innerHTML = '로딩 중...';
+        try {
+            const res = await fetch(`/static/projects/${proj}/meta.json`);
+            if (res.ok) {
+                const meta = await res.json();
+                const dzs = meta.danger_zones || {};
+                if (Object.keys(dzs).length === 0) {
+                    container.innerHTML = '<i>위험구역 없음</i>';
+                    return;
+                }
+                let html = '<ul style="margin-top:5px;">';
+                Object.keys(dzs).forEach(id => {
+                    html += `<li>
+                        [프레임 ${id}]
+                        <button onclick="deleteDangerZone('${proj}','${id}', '${containerId}')">삭제</button>
+                        <a href="/viewer/${video}?highlight=${id}">상세 관리</a>
+                    </li>`;
+                });
+                html += '</ul>';
+                container.innerHTML = html;
+            } else {
+                container.innerHTML = '<i>메타데이터 없음</i>';
+            }
+        } catch (e) {
+            container.innerHTML = '<i>에러</i>';
+        }
+    }
+    async function deleteDangerZone(proj, dzId, containerId) {
+        if (!confirm("정말 삭제할까요?")) return;
+        const res = await fetch(`/delete_danger_zone/${proj}/${dzId}`, { method: 'POST' });
+        if (res.ok) {
+            alert('삭제됨');
+            loadDangerZones(proj + '.mp4', containerId);
+        } else {
+            alert('삭제 실패');
+        }
+    }
+    window.onload = function() {
+        {% for video in videos %}
+            loadDangerZones("{{ video }}", "dzlist_{{ loop.index }}");
+        {% endfor %}
+    }
+    </script>
+</head>
+<body>
+    <h2>위험구역 관리 - 저장된 영상 목록</h2>
+    <ul>
+    {% for video in videos %}
+        <li>
+            <b>{{ video }}</b>
+            <a href="{{ url_for('video_viewer', filename=video) }}">
+                [위험구역 추가/관리]
+            </a>
+            <div id="dzlist_{{ loop.index }}" style="margin-left:20px; color:#222; font-size:90%;"></div>
+        </li>
+    {% endfor %}
+    </ul>
+    <hr>
+    <a href="{{ url_for('index') }}">← 홈으로</a>
+</body>
+</html>

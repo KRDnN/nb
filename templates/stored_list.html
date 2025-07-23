@@ -1,0 +1,131 @@
+<!-- templates/stored_list.html -->
+<!DOCTYPE html>
+<html>
+<head>
+    <title>저장된 영상 목록</title>
+</head>
+<body>
+    <h2>저장된 영상 목록</h2>
+    <ul>
+    {% for video in videos %}
+        <li>
+            <!-- 영상 뷰어로 이동 -->
+            <a href="{{ url_for('video_viewer', filename=video) }}">
+                <video width="320" controls muted>
+                    <source src="{{ url_for('stream_video', filename=video) }}" type="video/mp4">
+                </video>
+            </a>
+            <p><b>{{ video }}</b></p>
+
+        </li>
+    {% endfor %}
+    </ul>
+
+    <hr>
+    <a href="{{ url_for('index') }}">← 홈</a>
+</body>
+</html>
+
+<!-- video_player.html -->
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Video Player</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+        }
+        #frame {
+            border: 1px solid #ccc;
+            margin-bottom: 10px;
+        }
+        #slider {
+            width: 640px;
+        }
+        #frame-info {
+            margin-top: 5px;
+        }
+    </style>
+    <script>
+        let frameIndex = 0;
+        let maxFrames = 0;
+        let playing = false;
+        let timer = null;
+
+        async function fetchVideoInfo() {
+            const url = window.location.pathname;
+            const file = url.split('/').pop();
+            const res = await fetch(/video_info/${file});
+            const data = await res.json();
+            maxFrames = data.frame_count;
+            document.getElementById('slider').max = maxFrames;
+            document.getElementById('total-frame').innerText = maxFrames;
+        }
+
+        function updateFrame() {
+            const url = window.location.pathname;
+            const file = url.split('/').pop();
+            document.getElementById('frame').src = /frame/${file}/${frameIndex};
+            document.getElementById('slider').value = frameIndex;
+            document.getElementById('current-frame').innerText = frameIndex;
+        }
+
+        function playVideo() {
+            playing = true;
+            timer = setInterval(() => {
+                if (frameIndex < maxFrames - 1) {
+                    frameIndex++;
+                    updateFrame();
+                } else {
+                    pauseVideo();
+                }
+            }, 40); // 약 25 FPS
+        }
+
+        function pauseVideo() {
+            playing = false;
+            clearInterval(timer);
+        }
+
+        function togglePlay() {
+            if (playing) pauseVideo();
+            else playVideo();
+        }
+
+        function sliderChanged(value) {
+            frameIndex = parseInt(value);
+            updateFrame();
+        }
+
+        window.onload = async () => {
+            if (videoUploaded) {
+                await fetchVideoInfo();
+                updateFrame();
+            }
+        }
+    </script>
+</head>
+<body>
+    <h1>영상 재생기</h1>
+
+    {% if not video_uploaded %}
+    <form method="POST" enctype="multipart/form-data">
+        <input type="file" name="video" accept="video/*" required>
+        <button type="submit">업로드</button>
+    </form>
+    {% else %}
+    <div>
+        <img id="frame" width="640" height="360"><br>
+        <button onclick="togglePlay()">재생 / 정지</button><br>
+        <input id="slider" type="range" min="0" max="100" step="1" value="0"
+               onchange="sliderChanged(this.value)" oninput="sliderChanged(this.value)">
+        <div id="frame-info">
+            현재 프레임: <span id="current-frame">0</span> / <span id="total-frame">0</span>
+        </div>
+    </div>
+    {% endif %}
+
+    <hr>
+    <a href="{{ url_for('index') }}">← 홈으로</a>
+</body>
+</html>

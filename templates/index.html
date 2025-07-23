@@ -1,0 +1,137 @@
+<!-- index.html -->
+<!-- <!DOCTYPE html>
+<html>
+<head>
+    <title>RTSP 스트리밍</title>
+    <script>
+        async function fetchMatchStatus() {
+            const res = await fetch("/match_status");
+            const data = await res.json();
+            document.getElementById("match-status").innerText = 
+                `매칭 프로젝트: ${data.project || '없음'}, 매칭 프레임: ${data.match_frame}`;
+        }
+
+        setInterval(fetchMatchStatus, 1000);  // 1초마다 매칭 정보 갱신
+    </script>
+    <style>
+        .thumbs-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 5px;
+        }
+        .thumbs-container img {
+            width: 100px;
+            height: 70px;
+            object-fit: cover;
+            border: 1px solid #ccc;
+        }
+    </style>
+</head>
+<body>
+    <h1>RTSP 스트림 및 ORB 매칭</h1>
+
+    <form method="POST">
+        <input type="text" name="rtsp_url" placeholder="Enter RTSP URL" value="{{ rtsp_url }}">
+        <button type="submit">Connect</button>
+    </form>
+
+    {% if rtsp_url %}
+        <h2>스트리밍 중: {{ rtsp_url }}</h2>
+        <img src="{{ url_for('video_feed') }}" width="640">
+        <p id="match-status">매칭 상태 로딩 중...</p>
+    {% endif %}
+
+    <hr>
+    <h2>📁 저장된 ORB 프로젝트</h2>
+    {% if orb_projects %}
+        {% for project in orb_projects %}
+            <div>
+                <a href="{{ url_for('start_rtsp_match', project_name=project) }}">
+                    <strong>{{ project }}</strong>
+                </a>
+                <div class="thumbs-container">
+                    {% for i in range(30) %}
+                        <img src="{{ url_for('serve_project_thumb', project=project, idx=i) }}" alt="thumb {{ i }}">
+                    {% endfor %}
+                </div>
+
+                <hr>
+            </div>
+        {% endfor %}
+    {% else %}
+        <p>저장된 프로젝트가 없습니다.</p>
+    {% endif %}
+
+    <hr>
+    <a href="{{ url_for('upload_video') }}">📤 영상 업로드 재생</a><br>
+    <a href="{{ url_for('stored_videos') }}">📁 내부 저장된 영상 보기</a>
+</body>
+</html> -->
+<!-- templates/index.html -->
+<!-- templates/index.html -->
+<!-- templates/index.html -->
+<!DOCTYPE html>
+<html>
+<head>
+    <title>RTSP 스트리밍</title>
+    <script>
+        async function fetchMatchStatus() {
+            const res = await fetch("/match_status");
+            const data = await res.json();
+            document.getElementById("match-status").innerText =
+                `매칭 프로젝트: ${data.project || '없음'}, 매칭 프레임: ${data.match_frame}`;
+        }
+        setInterval(fetchMatchStatus, 1000);
+    </script>
+    <style>
+        .thumbs-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 5px;
+        }
+        .thumbs-container img {
+            width: 100px;
+            height: 70px;
+            object-fit: cover;
+            border: 1px solid #ccc;
+        }
+    </style>
+</head>
+<body>
+    <h1>RTSP 스트림 및 ORB 매칭</h1>
+    <form method="POST">
+        <input type="text" name="rtsp_url" placeholder="Enter RTSP URL" value="{{ rtsp_url }}">
+        <button type="submit">Connect</button>
+    </form>
+    {% if rtsp_url %}
+        <h2>스트리밍 중: {{ rtsp_url }}</h2>
+        <img src="{{ url_for('video_feed') }}" width="640">
+        <p id="match-status">매칭 상태 로딩 중...</p>
+    {% endif %}
+    <hr>
+    <h2>저장된 ORB 프로젝트</h2>
+    {% if orb_projects %}
+        {% for project in orb_projects %}
+            <div>
+                <a href="{{ url_for('start_rtsp_match', project_name=project) }}">
+                    <strong>{{ project }}</strong>
+                </a>
+                <div class="thumbs-container">
+                    {% for i in range(30) %}
+                        <img src="{{ url_for('serve_project_thumb', project=project, idx=i) }}" alt="thumb {{ i }}">
+                    {% endfor %}
+                </div>
+                <a href="{{ url_for('video_list') }}"><button>위험구역 관리</button></a>
+                <hr>
+            </div>
+        {% endfor %}
+    {% else %}
+        <p>저장된 프로젝트가 없습니다.</p>
+    {% endif %}
+    <hr>
+    <a href="{{ url_for('upload_video') }}">영상 업로드 재생</a><br>
+    <a href="{{ url_for('video_list') }}">📁 내부 저장된 영상 보기</a>
+</body>
+</html>

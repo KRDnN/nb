@@ -1,0 +1,293 @@
+<!-- templates/video_viewer.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Video Viewer</title>
+  <style>
+    body { font-family: Arial, sans-serif; }
+    .frame-container {
+      position: relative;
+      display: inline-block;
+      border: 2px solid black;
+    }
+    #frame-display, #stream-frame {
+      width: 640px;
+      height: 480px;
+      display: block;
+    }
+    #overlay {
+      position: absolute;
+      top: 0; left: 0;
+      width: 640px;
+      height: 480px;
+      pointer-events: none;
+    }
+    #controls { margin-top: 10px; }
+    #thumbnails {
+      display: flex;
+      overflow-x: auto;
+      padding: 5px;
+      margin-top: 10px;
+      border: 1px solid #ccc;
+      background-color: #f8f8f8;
+      width: 660px;
+    }
+    .thumb {
+      width: 120px;
+      height: 80px;
+      margin-right: 5px;
+      cursor: pointer;
+      border: 2px solid transparent;
+    }
+    .thumb.selected { border-color: red; }
+  </style>
+</head>
+<body>
+  <h2>Video Viewer</h2>
+
+  <!-- RTSP 연결 폼 -->
+  <form id="rtsp-form">
+    <input type="text" id="rtsp_url" placeholder="Enter RTSP URL">
+    <select id="project_select">
+      {% for proj in projects %}
+        <option value="{{ proj }}">{{ proj }}</option>
+      {% endfor %}
+    </select>
+    <button type="submit">🔗 Connect RTSP</button>
+  </form>
+
+  <br>
+  <iframe id="stream-frame" frameborder="0"></iframe>
+  <hr>
+
+  <h3>Stored Video Viewer: {{ filename }}</h3>
+  <div class="frame-container" id="container">
+    <img id="frame-display" src="/frame/{{ filename }}/0">
+    <canvas id="overlay" width="640" height="480"></canvas>
+  </div>
+
+  <!-- 위험구역 트래킹 실시간 프리뷰 -->
+  <img id="track-preview" width="640" height="480" style="display:none; margin-top:10px;">
+
+  <div id="controls">
+    <input type="range" id="frame-slider" min="0" max="0" value="0" style="width: 660px;">
+    <br>
+    <button type="button" onclick="togglePlay()">▶ Play</button>
+    <button type="button" onclick="toggleORB()">🧠 Toggle ORB</button>
+    <button type="button" onclick="startDangerZone()">⚠️ 위험구역 지정</button>
+    <button type="button" onclick="finishDangerZone()">✅ 위험구역 지정 완료</button>
+    <button type="button" onclick="extractProject()">💾 Save ORB Project</button>
+    <button type="button" onclick="trackDangerZone()">📈 위험구역 트래킹</button>
+    <button type="button" onclick="stopDangerTracking()" id="track-stop-btn" style="display:none;">⏹️ 트래킹 중지</button>
+  </div>
+  <div id="thumbnails"></div>
+  <script>
+    const filename = "{{ filename }}";
+    let totalFrames = 0;
+    let currentFrame = 0;
+    let playing = false;
+    let orbVisual = false;
+    let playInterval = null;
+    let drawing = false;
+    let points = [];
+    let dangerZones = {};
+
+    const slider = document.getElementById("frame-slider");
+    const display = document.getElementById("frame-display");
+    const thumbs = document.getElementById("thumbnails");
+    const canvas = document.getElementById("overlay");
+    const ctx = canvas.getContext("2d");
+
+    document.getElementById("rtsp-form").addEventListener("submit", function (e) {
+      e.preventDefault();
+      const rtsp_url = document.getElementById("rtsp_url").value;
+      const project = document.getElementById("project_select").value;
+      const streamFrame = document.getElementById("stream-frame");
+      streamFrame.src = `/video_feed?url=${encodeURIComponent(rtsp_url)}&project=${project}`;
+    });
+
+    async function fetchInfo() {
+      if (!filename) return;
+      const res = await fetch(`/video_info/${filename}`);
+      const info = await res.json();
+      totalFrames = info.frame_count;
+      slider.max = totalFrames - 1;
+      await loadDangerZones();
+      renderThumbnails();
+      updateFrame(0);
+    }
+
+    async function loadDangerZones() {
+      try {
+        const nameOnly = filename.split('.')[0];
+        const res = await fetch(`/static/projects/${nameOnly}/meta.json`);
+        if (res.ok) {
+          const meta = await res.json();
+          if (meta.danger_zones) {
+            dangerZones = meta.danger_zones;
+            for (let key in dangerZones) {
+              dangerZones[key] = dangerZones[key].map(([x, y]) => ({ x, y }));
+            }
+          }
+        }
+      } catch (e) {
+        console.warn("No meta.json found");
+      }
+    }
+
+    function updateFrame(idx) {
+      const orbFlag = orbVisual ? "?orb=1" : "";
+      display.src = `/frame/${filename}/${idx}${orbFlag}`;
+      currentFrame = idx;
+      slider.value = idx;
+      updateSelectedThumb(idx);
+      redrawOverlay();
+    }
+
+    slider.addEventListener("input", () => {
+      updateFrame(parseInt(slider.value));
+    });
+
+    function renderThumbnails() {
+      thumbs.innerHTML = "";
+      const step = 1;
+      for (let i = 0; i < totalFrames; i += step) {
+        const img = document.createElement("img");
+        img.src = `/thumbs/${filename}/${i}`;
+        img.className = "thumb";
+        img.onclick = () => updateFrame(i);
+        img.dataset.idx = i;
+        thumbs.appendChild(img);
+      }
+    }
+
+    function updateSelectedThumb(idx) {
+      document.querySelectorAll(".thumb").forEach(img => {
+        img.classList.remove("selected");
+        if (parseInt(img.dataset.idx) === idx) {
+          img.classList.add("selected");
+        }
+      });
+    }
+
+    function togglePlay() {
+      playing = !playing;
+      if (playing) {
+        playInterval = setInterval(() => {
+          currentFrame = (currentFrame + 1) % totalFrames;
+          updateFrame(currentFrame);
+        }, 100);
+      } else {
+        clearInterval(playInterval);
+      }
+    }
+
+    function toggleORB() {
+      orbVisual = !orbVisual;
+      updateFrame(currentFrame);
+    }
+
+    function extractProject() {
+      const payload = { danger_zones: {} };
+      for (let k in dangerZones) {
+        payload.danger_zones[k] = dangerZones[k].map(p => [p.x, p.y]);
+      }
+      fetch(`/extract/${filename}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+      .then(res => res.text())
+      .then(msg => alert(msg));
+    }
+
+    function startDangerZone() {
+      drawing = true;
+      points = [];
+      canvas.style.pointerEvents = 'auto';
+    }
+
+    function finishDangerZone() {
+      drawing = false;
+      dangerZones[currentFrame] = [...points];
+      canvas.style.pointerEvents = 'none';
+      redrawOverlay();
+    }
+
+    function redrawOverlay() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      let pts = drawing ? points : dangerZones[currentFrame];
+      if (pts && pts.length > 0) {
+        ctx.beginPath();
+        ctx.moveTo(pts[0].x, pts[0].y);
+        for (let i = 1; i < pts.length; i++) {
+          ctx.lineTo(pts[i].x, pts[i].y);
+        }
+        ctx.closePath();
+        ctx.fillStyle = "rgba(255,0,0,0.3)";
+        ctx.fill();
+
+        ctx.strokeStyle = "red";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(pts[0].x, pts[0].y);
+        for (let i = 1; i < pts.length; i++) {
+          ctx.lineTo(pts[i].x, pts[i].y);
+        }
+        ctx.closePath();
+        ctx.stroke();
+
+        pts.forEach(p => {
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, 4, 0, 2 * Math.PI);
+          ctx.fillStyle = "red";
+          ctx.fill();
+        });
+      }
+    }
+
+    // 트래킹 실시간 미리보기 통합
+    let trackingActive = false;
+
+    function trackDangerZone() {
+      if (!dangerZones[currentFrame] || dangerZones[currentFrame].length < 3) {
+        alert('먼저 위험구역을 지정하세요!');
+        return;
+      }
+      trackingActive = true;
+      document.getElementById('track-stop-btn').style.display = "";
+      fetch('/track_stream', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          filename: filename,
+          start_frame: currentFrame,
+          points: dangerZones[currentFrame]
+        })
+      }).then(() => {
+        display.src = `/track_stream?filename=${encodeURIComponent(filename)}&start_frame=${currentFrame}`;
+      });
+    }
+
+    function stopDangerTracking() {
+      trackingActive = false;
+      document.getElementById('track-stop-btn').style.display = "none";
+      fetch('/stop_danger_tracking', { method: 'POST' }).then(()=>{
+        updateFrame(currentFrame);
+      });
+    }
+
+    canvas.addEventListener("click", (e) => {
+      if (!drawing) return;
+      const rect = canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      points.push({ x, y });
+      redrawOverlay();
+    });
+
+    if (filename) fetchInfo();
+  </script>
+</body>
+</html>
