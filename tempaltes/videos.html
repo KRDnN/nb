@@ -1,0 +1,44 @@
+<!-- videos.html -->
+{% extends "base.html" %}
+{% block title %}내 동영상 | 안전 관리 매니저{% endblock %}
+
+{% block content %}
+<h2>📁 내 동영상</h2>
+<form method="POST" enctype="multipart/form-data" style="margin-bottom:30px;">
+    <input type="file" name="video" accept="video/*" required>
+    <button type="submit">업로드</button>
+</form>
+<div style="max-width: 1000px; margin:0;">
+  {% for video in videos %}
+    <div class="video-item"
+         style="
+            margin-bottom: 36px;
+            cursor: pointer;
+            border-radius: 22px;
+            padding: 25px 25px;
+            display: flex;
+            align-items: center;
+            gap: 54px;
+            background: #f3f8ff;
+            box-shadow: 0 2px 12px #cde4fd44;
+            min-width: 630px; min-height: 220px; /* 카드 전체 크기 */
+            transition: box-shadow 0.18s, background 0.18s;
+        "
+        onmouseover="this.style.background='#e6f2ff'; this.style.boxShadow='0 4px 16px #a7d1f2bb';"
+        onmouseout="this.style.background='#f3f8ff'; this.style.boxShadow='0 2px 12px #cde4fd44';"
+    >
+        <img src="{{ url_for('static', filename=video.thumb) }}" class="thumb"
+             style="width:240px; height:180px; border-radius:15px; border:2.2px solid #aab; object-fit:cover; background:#f6f6f6;">
+        <div class="video-info" style="flex:1; text-align:left;">
+            <div style="font-size:2.0em; font-weight:bold; color:#183a5d; margin-bottom:10px;">{{ video.name }}</div>
+            <div style="font-size:1.3em; color:#507fa0; margin-bottom:5px;">해상도: {{ video.resolution }}</div>
+            <div style="font-size:1.17em; color:#888; margin-bottom:12px;">길이: {{ video.duration }}초</div>
+            <a href="{{ url_for('danger_zone_list', video=video.name) }}"
+                style="font-size:1.25em; color:#206ad6; text-decoration:underline; font-weight:600;">➔ 위험구역 지정 바로가기</a>
+        </div>
+    </div>
+  {% else %}
+    <div style="color:gray;margin:60px;">등록된 동영상이 없습니다.</div>
+  {% endfor %}
+</div>
+{% endblock %}
