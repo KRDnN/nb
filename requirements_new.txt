@@ -1,0 +1,25 @@
+# Core web framework
+flask>=2.3.0,<3.0.0
+werkzeug>=2.3.0,<3.0.0
+
+# Computer vision and image processing
+opencv-python>=4.8.0,<5.0.0
+numpy>=1.24.0,<2.0.0
+pillow>=10.0.0,<11.0.0
+
+# MQTT communication (if needed)
+paho-mqtt>=1.6.0,<2.0.0
+
+# Development and testing dependencies
+pytest>=7.0.0,<8.0.0
+pytest-cov>=4.0.0,<5.0.0
+black>=23.0.0,<24.0.0
+flake8>=6.0.0,<7.0.0
+
+# Production dependencies
+gunicorn>=21.0.0,<22.0.0
+gevent>=23.0.0,<24.0.0
+
+# Optional: For enhanced features
+# redis>=4.5.0,<5.0.0  # For session storage and caching
+# celery>=5.3.0,<6.0.0  # For background tasks
