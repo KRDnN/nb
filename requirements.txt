@@ -4,4 +4,11 @@ werkzeug
 paho.mqtt
 pillow
 numpy
+torch>=1.12.0
+torchvision>=0.13.0
+scikit-learn
+matplotlib
+tqdm
+tensorboard
+kornia
 
